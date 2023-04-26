@@ -114,8 +114,11 @@ with open(os.path.join(input_path,"validation_input.txt"), "w",encoding='utf-8')
         fout.write("\n")
 
 
+
 from gensim.models import keyedvectors
 w2v=keyedvectors.load_word2vec_format(os.path.join(data_path,"wiki_word2vec_50.bin"),binary=True)
+
+
 
 vocab_l={}
 
@@ -132,3 +135,33 @@ with open(os.path.join(input_path,"word2vec.txt"), "w",encoding='utf-8') as fout
         for i in value:
             fout.write(" "+str(i))
         fout.write("\n")
+
+word2vec={}
+with open(os.path.join(input_path,"word2vec.txt"), encoding='utf-8') as f:
+    for line in f:
+        line=line.strip().split(" ")
+        word2vec[int(line[0].strip())]=[float(i) for i in line[1:]]
+
+
+for key,value in word2vec.items():
+    word2vec[key]=[float(i) for i in value]
+
+with open(os.path.join(input_path,"train_input.txt"), "r", encoding='utf-8') as fin:
+    train_data = pd.read_csv(os.path.join(input_path,"train_input.txt"),names=["label","comment"],sep="\t")
+    for i in range(len(train_data)):
+        comment=train_data["comment"][i].strip().split(" ")
+        train_data["comment"][i]=comment
+        train_data["comment"][i]=[word2vec[int(j)] for j in train_data["comment"][i]]
+
+
+with open(os.path.join(input_path,"test_input.txt"), "r", encoding='utf-8') as fin:
+    test_data = pd.read_csv(os.path.join(input_path,"test_input.txt"),names=["label","comment"],sep="\t")
+    for i in range(len(test_data)):
+        test_data["comment"][i]=test_data["comment"][i].strip().split(" ")
+        test_data["comment"][i]=[word2vec[int(j)] for j in test_data["comment"][i]]
+
+with open(os.path.join(input_path,"validation_input.txt"), "r", encoding='utf-8') as fin:
+    val_data = pd.read_csv(os.path.join(input_path,"validation_input.txt"),names=["label","comment"],sep="\t")
+    for i in range(len(val_data)):
+        val_data["comment"][i]=val_data["comment"][i].strip().split(" ")
+        val_data["comment"][i]=[word2vec[int(j)] for j in val_data["comment"][i]]

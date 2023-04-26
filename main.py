@@ -104,7 +104,7 @@ class TextCNN(nn.Module):
     def __init__(self):
         super(TextCNN, self).__init__()
 #               super(TextCNN, self).__init__()
-        self.W = nn.Embedding(num_embeddings=8072,embedding_dim=Embedding_size)
+        self.W = nn.Embedding(num_embeddings=8072,embedding_dim=Embedding_size)#8072是词典的大小，Embedding_size是词向量的维度。
         out_channel = Filter_num
         self.conv = nn.Sequential(
                     nn.Conv2d(1, out_channel, (2, Embedding_size)),#卷积核大小为2*Embedding_size
@@ -119,8 +119,7 @@ class TextCNN(nn.Module):
         #x:batch_size*seq_len
         embedding_X = self.W(X)
         # batch_size, sequence_length, embedding_size
-        embedding_X = embedding_X.unsqueeze(1)
-        # batch_size, 1,sequence_length, embedding_size
+        print("embedding_X.shape:",embedding_X.shape)
         conved = self.conv(embedding_X)
         #batch_size,10,seq_len-1,1
         #batch_size,10,seq_len-1,1
@@ -154,6 +153,8 @@ def train():
     model.train()
     for index, (batch_x, batch_y) in enumerate(TrainDataLoader):
         batch_x, batch_y = batch_x.to(device), batch_y.to(device)
+        print("batch_x.shape:",batch_x.shape)
+        print("batch_y.shape:",batch_y.shape)
         pred = model(batch_x)
         loss = F.nll_loss(pred, batch_y)
         acc = binary_acc(torch.max(pred, dim=1)[1], batch_y)

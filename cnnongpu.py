@@ -32,73 +32,63 @@ def print_basic_info():
     print("name of the GPU:", torch.cuda.get_device_name(0))
     print("device:", device)
 
+print_basic_info()
+
+
 # 从文件中读取预处理好的数据
 input_path="input/"
 with open(os.path.join(input_path,"vocab.txt"), encoding='utf-8') as fin:
     vocab = [i.split('\n')[0] for i in fin]
 word2idx = {i:index for index, i in enumerate(vocab)}
 
-word2vec={}
-with open(os.path.join(input_path,"word2vec.txt"), encoding='utf-8') as f:
-    for line in f:
-        line=line.strip().split(" ")
-        word2vec[int(line[0].strip())]=[float(i) for i in line[1:]]
-
-for key,value in word2vec.items():
-    word2vec[key]=[float(i) for i in value]
-
-
 # 读取预处理好的数据
 with open(os.path.join(input_path,"train_input.json"), "r", encoding='utf-8') as fin:
     train_data = json.load(fin)
+
 with open(os.path.join(input_path,"test_input.json"), "r", encoding='utf-8') as fin:
     test_data = json.load(fin)
 with open(os.path.join(input_path,"validation_input.json"), "r", encoding='utf-8') as fin:
     val_data = json.load(fin)
 
-
 #使用word2vec版本的。
 num_classs = 2#2分类问题。
 
 
-# 2. 数据拆分
-train_inputs = torch.FloatTensor(train_data['comment'])
-train_labels = torch.FloatTensor(train_data['label'])
-test_inputs = torch.FloatTensor(test_data['comment'])
-test_labels = torch.FloatTensor(test_data['label'])
-val_inputs = torch.FloatTensor(val_data['comment'])
-val_labels = torch.FloatTensor(val_data['label'])
-
-
-class CommentDataset(Dataset):
-    def __init__(self, data_input,data_label):
-        self.data = {'comment': data_input, 'label': data_label}
-        print("data_input_shape:",data_input.shape)
-        print("data_label_shape:",data_label.shape)
-
-    def __len__(self):
-        return len(self.data)
+class MyDataset(Dataset):
+    def __init__(self, data_set):
+        self.inputs = []
+        self.label = []
+        for i in data_set:
+            self.inputs.append(i['comment'])
+            self.label.append(i['label'])
+        self.inputs = torch.FloatTensor(self.inputs)
+        self.label = torch.FloatTensor(self.label)
 
     def __getitem__(self, index):
-        # comment = torch.tensor(self.data['comment'][index], dtype=torch.float32)
-        comment = self.data['comment'][index].clone().detach()
-        # label = torch.tensor(self.data['label'][index], dtype=torch.long)
-        label = self.data['label'][index].clone().detach()
+        return self.inputs[index], self.label[index]
 
-        return comment, label
+    def __len__(self):
+        return len(self.inputs)
 
 
-# 构建训练、验证和测试集
+# 2. 数据拆分
+train_dataset = MyDataset(train_data)
+test_dataset = MyDataset(test_data)
+val_dataset = MyDataset(val_data)
 
-train_dataset = CommentDataset(train_inputs,train_labels)
-val_dataset = CommentDataset(val_inputs,val_labels)
-test_dataset = CommentDataset(test_inputs,test_labels)
+
+
+
+# train_inputs = torch.FloatTensor(train_data['comment'])
+# train_labels = torch.FloatTensor(train_data['label'])
+# test_inputs = torch.FloatTensor(test_data['comment'])
+# test_labels = torch.FloatTensor(test_data['label'])
+# val_inputs = torch.FloatTensor(val_data['comment'])
+# val_labels = torch.FloatTensor(val_data['label'])
 
 # 使用DataLoader加载数据
 batch_size = 32
-train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-val_dataloader = DataLoader(val_dataset, batch_size=batch_size)
-test_dataloader = DataLoader(test_dataset, batch_size=batch_size)
+
 
 # 构建模型
 class LinearModel(nn.Module):
@@ -128,20 +118,18 @@ class MyModel(nn.Module):
         x = self.fc1(x)
         x = F.relu(x)
         x = self.fc2(x)
-        return x
+        return F.log_softmax(x)
 
 
 
 input_dim = 50*62  # 输入特征的维度（50维向量的总数）
 output_dim = 2     # 输出的数量（即类别的数量）
 # model = LinearModel(input_dim, output_dim)
-model=MyModel(input_dim,output_dim)
+model=MyModel(input_dim,output_dim).to(device)
 
 # 定义损失函数和优化器
 criterion = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters())
-
-data, label = train_dataset[0]  # 获取第一条数据和对应标签
 
 
 # 训练模型
@@ -150,17 +138,17 @@ for epoch in range(num_epochs):
     # 训练模式
     model.train()
     train_loss = 0.0
-    for i in range(len(train_data)):
+    from tqdm import tqdm
+    for i in tqdm(range(len(train_data))):
         # 前向传递
-        inputs=train_inputs[i]
-        labels=train_labels[i]
+        inputs, labels = train_dataset[i]
         label=labels.long()
         # convert label to 1d tensor
         label = label.view(-1)
         # 改变形状以适应模型
 
-        outputs = model(inputs)
-        loss = criterion(outputs, label)
+        outputs = model(inputs.to(device))
+        loss = criterion(outputs.to(device), label.to(device))
 
         # 反向传递和优化
         optimizer.zero_grad()
@@ -173,18 +161,26 @@ for epoch in range(num_epochs):
     model.eval()
     val_accuracy = 0.0
     with torch.no_grad():
-        for i in range(len(val_data)):
-            inputs = val_inputs[i]
-            labels = val_labels[i]
+        for i in tqdm(range(len(val_data))):
+            inputs, labels = val_dataset[i]
             inputs = inputs.view(-1, 50, 62).transpose(1, 2)  # 改变形状以适应模型
 
-            outputs = model(inputs)
+            outputs = model(inputs.to(device))
             _, predicted = torch.max(outputs.data, 1)
+            # get the value of predicted as a int
 
-            val_accuracy += (predicted == labels).sum().item()
+            predicted = predicted.item()
+            predicted=float(predicted)
+            #get the value of labels as a int
+            labels=labels.long()
+            labels=labels.item()
+            labels=float(labels)
 
-    train_loss /= len(train_dataloader)
-    val_accuracy /= len(val_dataloader)
+            # val_accuracy += (predicted == labels).sum().item()/len(val_data)
+            val_accuracy += (predicted == labels)
+
+    train_loss /= len(train_dataset)
+    val_accuracy /= len(val_dataset)
 
     print('Epoch [{}/{}], Train Loss: {:.4f}, Val Accuracy: {:.2f}%'
           .format(epoch+1, num_epochs, train_loss, val_accuracy*100))
@@ -194,16 +190,15 @@ test_accuracy = 0.0
 model.eval()
 with torch.no_grad():
     for i in range(len(test_data)):
-        inputs = test_inputs[i]
-        labels = test_labels[i]
+        inputs, labels = test_dataset[i]
         inputs = inputs.view(-1, 50, 62).transpose(1, 2)  # 改变形状以适应模型
 
-        outputs = model(inputs)
+        outputs = model(inputs.to(device))
         _, predicted = torch.max(outputs.data, 1)
 
-        test_accuracy += (predicted == labels).sum().item()
+        test_accuracy += (predicted == labels).sum().item()/len(test_data)
 
-test_accuracy /= len(test_dataloader)
+test_accuracy /= len(test_dataset)
 print('Test Accuracy: {:.2f}%'.format(test_accuracy*100))
 
 
