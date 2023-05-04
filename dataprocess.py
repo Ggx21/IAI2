@@ -70,55 +70,28 @@ print(pad_id)
 
 sequence_length = 62
 #对输入数据进行预处理,主要是对句子用索引表示且对句子进行截断与padding，将填充使用”把“来。
+
 def tokenizer(train_data=train_data):
     inputs = []
     sentence_char = [i.split() for i in train_data["comment"]]
     # 将输入文本进行padding
     for index,i in enumerate(sentence_char):
         temp=[word2idx.get(j,pad_id) for j in i]#表示如果词表中没有这个稀有词，无法获得，那么就默认返回pad_id。
-        if(len(i)<sequence_length):
-            #应该padding。
-            for _ in range(sequence_length-len(i)):
-                temp.append(pad_id)
-        else:
-            temp = temp[:sequence_length]
+        if len(temp)==0:
+            temp=[pad_id]
+        while len(temp)<sequence_length:
+            temp.extend(temp)
+        temp=temp[:sequence_length]
         inputs.append(temp)
-    return inputs
-train_input = tokenizer(train_data)
+    return {"comment":inputs,"label":train_data["label"]}
+train_data = tokenizer(train_data)
 test_data = pd.read_csv(test_path,names=["label","comment"],sep="\t")
-test_input = tokenizer(test_data)
+test_data = tokenizer(test_data)
 validation_data = pd.read_csv(validation_path,names=["label","comment"],sep="\t")
-validation_input = tokenizer(validation_data)
-
-# 将预处理好的数据储存到文件中
-
-if not os.path.exists(input_path):
-    os.mkdir(input_path)
-with open(os.path.join(input_path,"train_input.txt"), "w",encoding='utf-8') as fout:
-    for index,i in enumerate(train_input):
-        fout.write(str(train_data["label"][index])+"\t")
-        for j in i:
-            fout.write(str(j)+" ")
-        fout.write("\n")
-with open(os.path.join(input_path,"test_input.txt"), "w",encoding='utf-8') as fout:
-    for index,i in enumerate(test_input):
-        fout.write(str(test_data["label"][index])+"\t")
-        for j in i:
-            fout.write(str(j)+" ")
-        fout.write("\n")
-with open(os.path.join(input_path,"validation_input.txt"), "w",encoding='utf-8') as fout:
-    for index,i in enumerate(validation_input):
-        fout.write(str(validation_data["label"][index])+"\t")
-        for j in i:
-            fout.write(str(j)+" ")
-        fout.write("\n")
-
-
+validation_data = tokenizer(validation_data)
 
 from gensim.models import keyedvectors
 w2v=keyedvectors.load_word2vec_format(os.path.join(data_path,"wiki_word2vec_50.bin"),binary=True)
-
-
 
 vocab_l={}
 
@@ -146,22 +119,37 @@ with open(os.path.join(input_path,"word2vec.txt"), encoding='utf-8') as f:
 for key,value in word2vec.items():
     word2vec[key]=[float(i) for i in value]
 
-with open(os.path.join(input_path,"train_input.txt"), "r", encoding='utf-8') as fin:
-    train_data = pd.read_csv(os.path.join(input_path,"train_input.txt"),names=["label","comment"],sep="\t")
-    for i in range(len(train_data)):
-        comment=train_data["comment"][i].strip().split(" ")
-        train_data["comment"][i]=comment
-        train_data["comment"][i]=[word2vec[int(j)] for j in train_data["comment"][i]]
+import pickle
 
+train_input={}
+train_input["label"]=[i for i in train_data["label"]]
+train_input["comment"]=[]
+for index,i in enumerate(train_data["comment"]):
+    temp=[]
+    for j in i:
+        temp.append(word2vec[j])
+    train_input["comment"].append(temp)
+with open(os.path.join(input_path,"train_input.pkl"), "wb") as fout:
+    pickle.dump(train_input, fout)
 
-with open(os.path.join(input_path,"test_input.txt"), "r", encoding='utf-8') as fin:
-    test_data = pd.read_csv(os.path.join(input_path,"test_input.txt"),names=["label","comment"],sep="\t")
-    for i in range(len(test_data)):
-        test_data["comment"][i]=test_data["comment"][i].strip().split(" ")
-        test_data["comment"][i]=[word2vec[int(j)] for j in test_data["comment"][i]]
+validation_input={}
+validation_input["label"]=[i for i in validation_data["label"]]
+validation_input["comment"]=[]
+for index,i in enumerate(validation_data["comment"]):
+    temp=[]
+    for j in i:
+        temp.append(word2vec[j])
+    validation_input["comment"].append(temp)
+with open(os.path.join(input_path,"validation_input.pkl"), "wb") as fout:
+    pickle.dump(validation_input, fout)
 
-with open(os.path.join(input_path,"validation_input.txt"), "r", encoding='utf-8') as fin:
-    val_data = pd.read_csv(os.path.join(input_path,"validation_input.txt"),names=["label","comment"],sep="\t")
-    for i in range(len(val_data)):
-        val_data["comment"][i]=val_data["comment"][i].strip().split(" ")
-        val_data["comment"][i]=[word2vec[int(j)] for j in val_data["comment"][i]]
+test_input={}
+test_input["label"]=[i for i in test_data["label"]]
+test_input["comment"]=[]
+for index,i in enumerate(test_data["comment"]):
+    temp=[]
+    for j in i:
+        temp.append(word2vec[j])
+    test_input["comment"].append(temp)
+with open(os.path.join(input_path,"test_input.pkl"), "wb") as fout:
+    pickle.dump(test_input, fout)
