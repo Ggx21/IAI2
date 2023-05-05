@@ -7,4 +7,7 @@ testset
 input/
 input
 
+junks/
+junks
+
 *.docx

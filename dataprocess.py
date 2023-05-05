@@ -8,6 +8,7 @@ import pandas as pd
 from collections import Counter
 import os
 import json
+import pickle
 
 
 data_path="Dataset/"
@@ -16,140 +17,94 @@ train_path=data_path+"train.txt"
 test_path=data_path+"test.txt"
 validation_path=data_path+"validation.txt"
 freq_treshold=10
-average_len=62
 
 
+class DataProcesser():
+    """
+    用于处理数据的类
+    使用方法：
+    1.初始化DataProcesser类
+    2.run()方法
+    """
+    def __init__(self,train_path,test_path,validation_path):
+        self.sequence_length = 96
+        self.train_path=train_path
+        self.test_path=test_path
+        self.validation_path=validation_path
+        self.pad_char="把"
+        self.pad_id=0
+        self.word2idx={}
+        self.vocab=None#词表,是一个所有可能词（出现次数大于阈值）set
+        self.train_data=None
+        self.test_data=None
+        self.validation_data=None
 
-train_data = pd.read_csv(train_path,names=["label","comment"],sep="\t")
+    def set_vocab(self):
+        with open(os.path.join(data_path,"word_freq.txt"), encoding='utf-8') as fin:
+            vocab = [i.split("\t")[0] for i in fin]
+            vocab=set(vocab)#去重
+            self.vocab=vocab
+        self.word2idx={i:index for index, i in enumerate(vocab)}#构建词表
+        self.pad_id=self.word2idx[self.pad_char]#设置pad_id，即pad_char在词表中的索引
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-print("device:", device)
+    def tokenizer(self,data):
+        inputs = []
+        sentence_list = [i.split() for i in data["comment"]]
+        # 将输入文本进行padding
+        for sentence in sentence_list:
+            temp=[self.word2idx.get(word,self.pad_id) for word in sentence]#如果word2idx中有这个词，那么就返回这个词的索引，如果没有，那么就返回pad_id
+            if len(temp)==0:
+                temp=[self.pad_id]
+            while len(temp)<self.sequence_length:#如果句子长度小于sequence_length，那么复制一份句子，直到句子长度大于等于sequence_length
+                temp.extend(temp)
+            temp=temp[:self.sequence_length]#截断句子，使得句子长度等于sequence_length
+            inputs.append(temp)
+        return {"comment":inputs,"label":data["label"]}
 
-def print_basic_info():
-    # print basic information of the GPU
-    print("name of the GPU:", torch.cuda.get_device_name(0))
-    print("device:", device)
+    def init_raw_data(self):
+        train_data = pd.read_csv(self.train_path,names=["label","comment"],sep="\t")
+        test_data = pd.read_csv(self.test_path,names=["label","comment"],sep="\t")
+        validation_data = pd.read_csv(self.validation_path,names=["label","comment"],sep="\t")
+        self.train_data = self.tokenizer(train_data)
+        self.test_data = self.tokenizer(test_data)
+        self.validation_data = self.tokenizer(validation_data)
 
-Embedding_size = 60
-Batch_Size = 10
-Kernel = 10
-Filter_num = 10#卷积核的数量。
-Epoch = 60
-Dropout = 0.5
-Learning_rate = 1e-3
+    def init_word_vec(self):
+        from gensim.models import keyedvectors
+        w2v=keyedvectors.load_word2vec_format(os.path.join(data_path,"wiki_word2vec_50.bin"),binary=True)
+        vocab_l={}
+        for word in self.vocab:
+            word_idx=self.word2idx[word]
+            try:
+                vocab_l[word_idx]=w2v[word]
+            except KeyError:
+                vocab_l[word_idx]=np.random.uniform(-0.25,0.25,50)
+        self.word2vec=vocab_l
 
-class TextCNNDataSet(Data.Dataset):
-    def __init__(self, data_inputs, data_targets):
-        self.inputs = torch.LongTensor(data_inputs)
-        self.label = torch.LongTensor(data_targets)
+    def pkl_dump_word2vec(self,data, path):
+        data_input={}
+        data_input["label"]=[i for i in data["label"]]
+        data_input["comment"]=[]
+        for i in data["comment"]:
+            temp=[]
+            for j in i:
+                temp.append(self.word2vec[j])
+            data_input["comment"].append(temp)
+        with open(os.path.join(input_path,path), "wb") as fout:
+            pickle.dump(data_input, fout)
 
-    def __getitem__(self, index):
-        return self.inputs[index], self.label[index]
+    def gen_data_input(self):
+        with open(os.path.join(input_path,"word2vec.pkl"), "wb") as fout:
+            pickle.dump(self.word2vec, fout)
+        self.pkl_dump_word2vec(self.train_data,"train_input.pkl")
+        self.pkl_dump_word2vec(self.test_data,"test_input.pkl")
+        self.pkl_dump_word2vec(self.validation_data,"validation_input.pkl")
 
-    def __len__(self):
-        return len(self.inputs)
+    def run(self):
+        self.set_vocab()
+        self.init_raw_data()
+        self.init_word_vec()
+        self.gen_data_input()
 
-with open(os.path.join(data_path,"word_freq.txt"), encoding='utf-8') as fin:
-    vocab = [i.split("\t")[0] for i in fin]
-vocab=set(vocab)
-with open(os.path.join(input_path,"vocab.txt"),'w', encoding='utf-8') as fout:
-    for i in vocab:
-        fout.write(i+"\n")
-
-word2idx = {i:index for index, i in enumerate(vocab)}
-with open(os.path.join(input_path,"word2idx.json"), "w", encoding='utf-8') as f:
-    json.dump(word2idx, f)
-idx2word = {index:i for index, i in enumerate(vocab)}
-with open(os.path.join(input_path,"idx2word.json"), "w", encoding='utf-8') as f:
-    json.dump(idx2word, f)
-vocab_size = len(vocab)
-print("vocab_size:",vocab_size)
-
-pad_id=word2idx["把"]
-print(pad_id)
-
-sequence_length = 62
-#对输入数据进行预处理,主要是对句子用索引表示且对句子进行截断与padding，将填充使用”把“来。
-
-def tokenizer(train_data=train_data):
-    inputs = []
-    sentence_char = [i.split() for i in train_data["comment"]]
-    # 将输入文本进行padding
-    for index,i in enumerate(sentence_char):
-        temp=[word2idx.get(j,pad_id) for j in i]#表示如果词表中没有这个稀有词，无法获得，那么就默认返回pad_id。
-        if len(temp)==0:
-            temp=[pad_id]
-        while len(temp)<sequence_length:
-            temp.extend(temp)
-        temp=temp[:sequence_length]
-        inputs.append(temp)
-    return {"comment":inputs,"label":train_data["label"]}
-train_data = tokenizer(train_data)
-test_data = pd.read_csv(test_path,names=["label","comment"],sep="\t")
-test_data = tokenizer(test_data)
-validation_data = pd.read_csv(validation_path,names=["label","comment"],sep="\t")
-validation_data = tokenizer(validation_data)
-
-from gensim.models import keyedvectors
-w2v=keyedvectors.load_word2vec_format(os.path.join(data_path,"wiki_word2vec_50.bin"),binary=True)
-
-vocab_l={}
-
-for word in vocab:
-    word_idx=word2idx[word]
-    try:
-        vocab_l[word_idx]=w2v[word]
-    except KeyError:
-        vocab_l[word_idx]=np.random.uniform(-0.25,0.25,50)
-
-with open(os.path.join(input_path,"word2vec.txt"), "w",encoding='utf-8') as fout:
-    for key,value in vocab_l.items():
-        fout.write(str(key)+"\t")
-        for i in value:
-            fout.write(" "+str(i))
-        fout.write("\n")
-
-word2vec={}
-with open(os.path.join(input_path,"word2vec.txt"), encoding='utf-8') as f:
-    for line in f:
-        line=line.strip().split(" ")
-        word2vec[int(line[0].strip())]=[float(i) for i in line[1:]]
-
-
-for key,value in word2vec.items():
-    word2vec[key]=[float(i) for i in value]
-
-import pickle
-
-train_input={}
-train_input["label"]=[i for i in train_data["label"]]
-train_input["comment"]=[]
-for index,i in enumerate(train_data["comment"]):
-    temp=[]
-    for j in i:
-        temp.append(word2vec[j])
-    train_input["comment"].append(temp)
-with open(os.path.join(input_path,"train_input.pkl"), "wb") as fout:
-    pickle.dump(train_input, fout)
-
-validation_input={}
-validation_input["label"]=[i for i in validation_data["label"]]
-validation_input["comment"]=[]
-for index,i in enumerate(validation_data["comment"]):
-    temp=[]
-    for j in i:
-        temp.append(word2vec[j])
-    validation_input["comment"].append(temp)
-with open(os.path.join(input_path,"validation_input.pkl"), "wb") as fout:
-    pickle.dump(validation_input, fout)
-
-test_input={}
-test_input["label"]=[i for i in test_data["label"]]
-test_input["comment"]=[]
-for index,i in enumerate(test_data["comment"]):
-    temp=[]
-    for j in i:
-        temp.append(word2vec[j])
-    test_input["comment"].append(temp)
-with open(os.path.join(input_path,"test_input.pkl"), "wb") as fout:
-    pickle.dump(test_input, fout)
+data_processer=DataProcesser(train_path,test_path,validation_path)
+data_processer.run()
