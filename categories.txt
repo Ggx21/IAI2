@@ -1,0 +1,116 @@
+卷 Data 的文件夹 PATH 列表
+卷序列号为 A416-CC7B
+D:.
+│  .DS_Store
+│  .gitignore
+│  categories.txt
+│  dataprocess.py
+│  DLongpu.py
+│  module.py
+│  实验二说明文档.docx
+│  
+├─Dataset
+│      test.txt
+│      train.txt
+│      validation.txt
+│      wiki_word2vec_50.bin
+│      word_freq.txt
+│      
+├─input
+│      cnn_model.pkl
+│      test_input.pkl
+│      train_input.pkl
+│      validation_input.pkl
+│      word2vec.pkl
+│      
+├─junks
+│  │  dataprocess_goolenet.py
+│  │  densenet.py
+│  │  googlenet.py
+│  │  resnet.py
+│  │  rnnongpu.py
+│  │  
+│  ├─g_Model
+│  │      cnn_model.pkl
+│  │      dense_model.pkl
+│  │      
+│  ├─input_google
+│  │      idx2word.json
+│  │      test_input.pkl
+│  │      train_input.pkl
+│  │      validation_input.pkl
+│  │      vocab.txt
+│  │      word2idx.json
+│  │      word2vec.txt
+│  │      
+│  ├─module copy
+│  │      BiLSTM.pkl
+│  │      CNN_complex.pkl
+│  │      CNN_simple.pkl
+│  │      DenseNet.pkl
+│  │      GoogLeNet.pkl
+│  │      LSTM.pkl
+│  │      ResNet.pkl
+│  │      
+│  └─testset
+│          test.txt
+│          train.txt
+│          validation.txt
+│          wiki_word2vec_50.bin
+│          word_freq.txt
+│          
+├─module
+│      BiLSTM.pkl
+│      CNN_complex.pkl
+│      CNN_simple.pkl
+│      DenseNet.pkl
+│      GoogLeNet.pkl
+│      LSTM.pkl
+│      MLP.pkl
+│      MLP_with_Dropout.pkl
+│      ResNet.pkl
+│      RNN.pkl
+│      test.py
+│      
+├─plot
+│      all_acc_F1.png
+│      The accuracy of BiLSTM module.png
+│      The accuracy of CNN_complex module.png
+│      The accuracy of CNN_simple module.png
+│      The accuracy of DenseNet module.png
+│      The accuracy of GoogLeNet module.png
+│      The accuracy of LSTM module.png
+│      The accuracy of MLP module.png
+│      The accuracy of MLP_with_Dropout module.png
+│      The accuracy of ResNet module.png
+│      The accuracy of RNN module.png
+│      The f of BiLSTM module.png
+│      The f of CNN_complex module.png
+│      The f of CNN_simple module.png
+│      The f of DenseNet module.png
+│      The f of GoogLeNet module.png
+│      The f of LSTM module.png
+│      The f of MLP module.png
+│      The f of MLP_with_Dropout module.png
+│      The f of ResNet module.png
+│      The f of RNN module.png
+│      The loss of BiLSTM module.png
+│      The loss of CNN_complex module.png
+│      The loss of CNN_simple module.png
+│      The loss of DenseNet module.png
+│      The loss of GoogLeNet module.png
+│      The loss of LSTM module.png
+│      The loss of MLP module.png
+│      The loss of MLP_with_Dropout module.png
+│      The loss of ResNet module.png
+│      The loss of RNN module.png
+│      train_acc.png
+│      train_f1.png
+│      train_loss.png
+│      val_acc.png
+│      val_f1.png
+│      
+└─__pycache__
+        model.cpython-311.pyc
+        module.cpython-311.pyc
+        
