@@ -341,6 +341,7 @@ if __name__ == '__main__':
         plt.scatter(range(0, len(avaliable_models)), acc_list)
         plt.scatter(range(0, len(avaliable_models)), F1_list)
         plt.legend(["acc", "F1"])
+        plt.subplots_adjust(bottom=0.2)
         plt.xticks(range(0, len(avaliable_models)), avaliable_models,rotation=75)
         plt.axhline(y=0.8, color='r', linestyle='--')
         plt.savefig("plot/all_acc_F1.png")
